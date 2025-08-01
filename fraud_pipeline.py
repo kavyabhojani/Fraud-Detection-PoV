@@ -27,7 +27,8 @@ def feature_engineering(df):
     return df
 
 def train_model(df):
-    X = df.drop('Class', axis=1)
+    features = ["Time", "Amount", "Amount_log", "Hour"]
+    X = df[features]
     y = df['Class']
 
     scaler = StandardScaler()
@@ -37,7 +38,7 @@ def train_model(df):
         X, y, stratify=y, test_size=0.2, random_state=42
     )
 
-    #class imbalance
+    #handling class imbalance
     scale = (len(y_train) - sum(y_train)) / sum(y_train)
     model = XGBClassifier(
         n_estimators=300,
