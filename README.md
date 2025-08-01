@@ -8,13 +8,17 @@ The goal is to showcase how machine learning can **reduce false positives**, **d
 ## Features
 - **End-to-end ML pipeline** using [XGBoost](https://xgboost.ai/) with cost-sensitive learning to handle class imbalance.
 - **Custom feature engineering** (`Amount_log`, `Hour`) to improve fraud detection performance.
-- **Streamlit dashboard** for real-time transaction scoring and client-facing PoV demonstrations.
+- **Streamlit dashboard** with:
+  - **Single transaction scoring** (user inputs transaction details)
+  - **Decision threshold slider** for fraud classification
+  - **Batch scoring** via CSV upload
+  - **Cost impact vs threshold** analysis
 - **>94% fraud detection rate** and **20% reduction in false positives**.
 
 ---
 
 ## How to Run
 
-### Install Dependencies
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
