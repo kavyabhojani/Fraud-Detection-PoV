@@ -17,7 +17,7 @@ The goal is to showcase how machine learning can **reduce false positives**, **d
 
 ---
 
-![Dashboard Home](images/dashboard_home.png)
+![Dashboard Home](images/img.png)
 
 
 ## How to Run
