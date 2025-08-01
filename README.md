@@ -17,6 +17,9 @@ The goal is to showcase how machine learning can **reduce false positives**, **d
 
 ---
 
+![Dashboard Home](images/dashboard_home.png)
+
+
 ## How to Run
 
 ### 1. Install Dependencies
