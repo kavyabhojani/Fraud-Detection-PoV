@@ -1,6 +1,6 @@
 # Fraud Detection Proof of Value (PoV)
 
-This project demonstrates a **Proof of Value (PoV)** for credit card fraud detection, reflecting how a Data Scientist delivers quick, high-impact solutions for financial services clients.  
+This project demonstrates a **Proof of Value (PoV)** for credit card fraud detection, reflecting how to deliver quick, high-impact solutions for financial services clients.  
 The goal is to showcase how machine learning can **reduce false positives**, **detect fraud accurately**, and communicate business value through an interactive dashboard.
 
 ---
