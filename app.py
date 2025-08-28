@@ -4,9 +4,17 @@ import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
+import json
 
 model = joblib.load("models/fraud_xgb.pkl")
 scaler = joblib.load("models/scaler.pkl")
+
+# load training reference stats (saved during pipeline training)
+try:
+    with open("models/train_stats.json", "r") as f:
+        TRAIN_STATS = json.load(f)
+except Exception:
+    TRAIN_STATS = None
 
 st.set_page_config(page_title="Fraud Detection PoV", layout="wide")
 st.title("Fraud Detection Proof of Value (PoV) Dashboard")
@@ -41,6 +49,17 @@ def reason_codes_from_features(row, scaler):
     if not codes:
         codes.append("No dominant single risk factor")
     return codes
+
+# PSI helper
+def psi(actual_counts, expected_counts, eps=1e-6):
+    actual = np.array(actual_counts) + eps
+    expected = np.array(expected_counts) + eps
+    return np.sum((actual - expected) * np.log(actual / expected))
+
+def hist_dist(values, edges):
+    counts, _ = np.histogram(values, bins=np.array(edges))
+    prob = counts / counts.sum() if counts.sum() > 0 else np.zeros_like(counts, dtype=float)
+    return prob.tolist()
 
 st.sidebar.header("Single Transaction Scoring")
 amount = st.sidebar.number_input("Transaction Amount", min_value=0.0, value=125.79)
@@ -86,7 +105,6 @@ if uploaded_file is not None:
         data_orig["Fraud_Probability"] = proba
         data_orig["Prediction"] = prediction
 
-        # add reason codes
         data_orig["Reason_Codes"] = [
             "; ".join(reason_codes_from_features(
                 {"Time_raw": t, "Amount_raw": a, "Hour_raw": (t//3600)%24}, scaler
@@ -135,6 +153,36 @@ if uploaded_file is not None:
                                   columns=["Pred 0", "Pred 1"]))
         else:
             st.info("No `Label` column found — using default threshold chart only.")
+
+        # drift monitoring
+        if TRAIN_STATS is not None:
+            st.subheader("Data Drift Check (PSI)")
+            time_edges = TRAIN_STATS["Time"]["edges"]
+            time_ref = TRAIN_STATS["Time"]["dist"]
+            time_cur = hist_dist(data_orig["Time"].values, time_edges)
+            psi_time = psi(time_cur, time_ref)
+
+            amt_edges = TRAIN_STATS["Amount"]["edges"]
+            amt_ref = TRAIN_STATS["Amount"]["dist"]
+            amt_cur = hist_dist(data_orig["Amount"].values, amt_edges)
+            psi_amt = psi(amt_cur, amt_ref)
+
+            hr_ref = np.array(TRAIN_STATS["Hour"])
+            hr_cur = data_orig["Hour"].value_counts(normalize=True).reindex(range(24), fill_value=0).values
+            psi_hr = psi(hr_cur, hr_ref)
+
+            drift_df = pd.DataFrame({
+                "Feature": ["Time", "Amount", "Hour"],
+                "PSI": [psi_time, psi_amt, psi_hr],
+                "Status": [
+                    "Severe" if psi_time >= 0.25 else "Moderate" if psi_time >= 0.1 else "OK",
+                    "Severe" if psi_amt >= 0.25 else "Moderate" if psi_amt >= 0.1 else "OK",
+                    "Severe" if psi_hr >= 0.25 else "Moderate" if psi_hr >= 0.1 else "OK",
+                ],
+            })
+            st.dataframe(drift_df)
+        else:
+            st.info("Training reference stats not found; run the training pipeline to enable drift checks.")
 
 st.subheader("Model Performance Metrics")
 col1, col2 = st.columns(2)
