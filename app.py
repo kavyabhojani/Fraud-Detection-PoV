@@ -18,6 +18,30 @@ st.markdown("""
 - **Real-time scoring pipeline**
 """)
 
+# reason code helper
+def reason_codes_from_features(row, scaler):
+    codes = []
+    means = dict(zip(["Time", "Amount", "Amount_log"], scaler.mean_))
+    scales = dict(zip(["Time", "Amount", "Amount_log"], scaler.scale_))
+
+    def zscore(col, raw):
+        return (raw - means[col]) / (scales[col] if scales[col] != 0 else 1.0)
+
+    z_amount = zscore("Amount", row["Amount_raw"])
+    z_time = zscore("Time", row["Time_raw"])
+    hour = int(row["Hour_raw"])
+
+    if z_amount > 2.0:
+        codes.append("Unusually large amount")
+    if hour in [0,1,2,3,4,5]:
+        codes.append("Off-hours spend (1–5 AM)")
+    if z_time < -1.5:
+        codes.append("Atypical early transaction time")
+
+    if not codes:
+        codes.append("No dominant single risk factor")
+    return codes
+
 st.sidebar.header("Single Transaction Scoring")
 amount = st.sidebar.number_input("Transaction Amount", min_value=0.0, value=125.79)
 time_sec = st.sidebar.number_input("Time since first transaction (seconds)", min_value=0, value=10000)
@@ -28,11 +52,21 @@ if st.sidebar.button("Predict Transaction"):
     hour = (time_sec // 3600) % 24
     X = pd.DataFrame([[time_sec, amount, amount_log, hour]],
                      columns=["Time", "Amount", "Amount_log", "Hour"])
-    X[["Time", "Amount", "Amount_log"]] = scaler.transform(X[["Time", "Amount", "Amount_log"]])
-    proba = model.predict_proba(X)[:, 1][0]
+    X_scaled = X.copy()
+    X_scaled[["Time", "Amount", "Amount_log"]] = scaler.transform(X_scaled[["Time", "Amount", "Amount_log"]])
+    proba = model.predict_proba(X_scaled)[:, 1][0]
     prediction = 1 if proba >= threshold else 0
+
+    X_scaled["Time_raw"] = time_sec
+    X_scaled["Amount_raw"] = amount
+    X_scaled["Hour_raw"] = hour
+    reasons = reason_codes_from_features(X_scaled.iloc[0], scaler)
+
     st.sidebar.write(f"**Fraud Probability:** {proba:.4f}")
     st.sidebar.write(f"**Prediction:** {'Fraud' if prediction == 1 else 'Legitimate'}")
+    st.sidebar.write("**Reason Codes:**")
+    for r in reasons:
+        st.sidebar.write(f"- {r}")
 
 st.subheader("Batch Scoring (CSV Upload)")
 uploaded_file = st.file_uploader("Upload CSV file with 'Time' and 'Amount' columns", type=["csv"])
@@ -52,6 +86,14 @@ if uploaded_file is not None:
         data_orig["Fraud_Probability"] = proba
         data_orig["Prediction"] = prediction
 
+        # add reason codes
+        data_orig["Reason_Codes"] = [
+            "; ".join(reason_codes_from_features(
+                {"Time_raw": t, "Amount_raw": a, "Hour_raw": (t//3600)%24}, scaler
+            ))
+            for t, a in zip(data_orig["Time"].values, data_orig["Amount"].values)
+        ]
+
         st.write("### Predictions")
         st.dataframe(data_orig.head(20))
         fraud_count = (prediction == 1).sum()
@@ -59,7 +101,6 @@ if uploaded_file is not None:
         st.write(f"**Predicted Fraudulent:** {fraud_count}")
         st.write(f"**Predicted Legitimate:** {legit_count}")
 
-# cost aware threshold optimization
         st.subheader("Threshold & Cost Optimization")
         fp_cost = st.sidebar.number_input("Cost of False Positive ($)", min_value=0, value=50, step=10)
         fn_cost = st.sidebar.number_input("Cost of False Negative ($)", min_value=0, value=500, step=50)
