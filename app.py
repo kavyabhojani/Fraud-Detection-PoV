@@ -24,7 +24,6 @@ time_sec = st.sidebar.number_input("Time since first transaction (seconds)", min
 threshold = st.sidebar.slider("Decision Threshold", 0.0, 1.0, 0.5, 0.01)
 
 if st.sidebar.button("Predict Transaction"):
-    #feature engineering
     amount_log = np.log1p(amount)
     hour = (time_sec // 3600) % 24
     X = pd.DataFrame([[time_sec, amount, amount_log, hour]],
@@ -50,7 +49,6 @@ if uploaded_file is not None:
         proba = model.predict_proba(data)[:, 1]
         prediction = (proba >= threshold).astype(int)
 
-        # Add prediction results to original values (not scaled)
         data_orig["Fraud_Probability"] = proba
         data_orig["Prediction"] = prediction
 
@@ -61,26 +59,41 @@ if uploaded_file is not None:
         st.write(f"**Predicted Fraudulent:** {fraud_count}")
         st.write(f"**Predicted Legitimate:** {legit_count}")
 
-        st.subheader("Threshold vs Cost Impact")
+# cost aware threshold optimization
+        st.subheader("Threshold & Cost Optimization")
+        fp_cost = st.sidebar.number_input("Cost of False Positive ($)", min_value=0, value=50, step=10)
+        fn_cost = st.sidebar.number_input("Cost of False Negative ($)", min_value=0, value=500, step=50)
 
-        thresholds = np.linspace(0, 1, 50)
-        costs = []
+        if "Label" in data_orig.columns:
+            true_labels = data_orig["Label"].astype(int).values
+            thresholds = np.linspace(0, 1, 101)
+            costs = []
 
-        #assuming label = fraud if probability > 0.5 (for demo)
-        true_labels = (proba > 0.5).astype(int)
-        for t in thresholds:
-            preds = (proba >= t).astype(int)
-            tn, fp, fn, tp = confusion_matrix(true_labels, preds, labels=[0, 1]).ravel()
-            cost = fp * 50 + fn * 500
-            costs.append(cost)
+            for t in thresholds:
+                preds = (proba >= t).astype(int)
+                tn, fp, fn, tp = confusion_matrix(true_labels, preds, labels=[0, 1]).ravel()
+                costs.append(fp * fp_cost + fn * fn_cost)
 
-        fig, ax = plt.subplots()
-        ax.plot(thresholds, costs, label="Total Cost")
-        ax.set_xlabel("Threshold")
-        ax.set_ylabel("Cost ($)")
-        ax.set_title("Cost vs Threshold")
-        ax.legend()
-        st.pyplot(fig)
+            fig, ax = plt.subplots()
+            ax.plot(thresholds, costs, label="Total Cost")
+            ax.set_xlabel("Threshold")
+            ax.set_ylabel("Cost ($)")
+            ax.set_title("Cost vs Threshold (using true labels)")
+            ax.legend()
+            st.pyplot(fig)
+
+            best_idx = int(np.argmin(costs))
+            best_t = thresholds[best_idx]
+            st.success(f"Recommended threshold: **{best_t:.2f}** (min cost ${costs[best_idx]:,.0f})")
+
+            best_preds = (proba >= best_t).astype(int)
+            tn, fp, fn, tp = confusion_matrix(true_labels, best_preds, labels=[0, 1]).ravel()
+            st.write("**Confusion Matrix @ recommended threshold**")
+            st.write(pd.DataFrame([[tn, fp], [fn, tp]],
+                                  index=["Actual 0", "Actual 1"],
+                                  columns=["Pred 0", "Pred 1"]))
+        else:
+            st.info("No `Label` column found — using default threshold chart only.")
 
 st.subheader("Model Performance Metrics")
 col1, col2 = st.columns(2)
