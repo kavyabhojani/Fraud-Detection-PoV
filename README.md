@@ -6,14 +6,16 @@ The goal is to showcase how machine learning can **reduce false positives**, **d
 ---
 
 ## Features
-- **End-to-end ML pipeline** using [XGBoost](https://xgboost.ai/) with cost-sensitive learning to handle class imbalance.
-- **Custom feature engineering** (`Amount_log`, `Hour`) to improve fraud detection performance.
-- **Streamlit dashboard** with:
+- **End-to-end ML pipeline** with [XGBoost](https://xgboost.ai/), cost-sensitive training for class imbalance.
+- **Custom feature engineering** (`Amount_log`, `Hour`) to boost model performance.
+- **Interactive Streamlit dashboard** with:
   - **Single transaction scoring** (user inputs transaction details)
-  - **Decision threshold slider** for fraud classification
   - **Batch scoring** via CSV upload
-  - **Cost impact vs threshold** analysis
-- **>94% fraud detection rate** and **20% reduction in false positives**.
+  - **Decision threshold slider** to adjust fraud detection sensitivity
+  - **Cost-aware thresholding** with false positive/false negative costs and optimal threshold recommendation
+  - **Explainability** through lightweight *reason codes* (e.g., “Unusually large amount”, “Off-hours spend”)
+  - **Drift monitoring** using **Population Stability Index (PSI)** to detect data shifts over time
+- **>94% fraud detection rate** and **20% reduction in false positives** in evaluation.
 
 ---
 
